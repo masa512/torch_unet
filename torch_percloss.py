@@ -20,7 +20,7 @@ class Perceptual_loss(torch.nn.module):
 		for p in self.parameters():
 			p.requires_grad = False
 
-	def fwd(self,yhat,y,blocks=[0,0,0,0]):
+	def forward(self,yhat,y,blocks=[0,0,0,0]):
 		
 		y1 = self.vgg16_block1(y)
 		y2 = self.vgg16_block2(y1)

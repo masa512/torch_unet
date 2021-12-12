@@ -1,6 +1,7 @@
 # helper function/class for the training, mainly
 from torch.utils.data import Dataset
 from torch.torchvision import transforms
+import torch.nn.functional.l1_loss as l1_loss
 import numpy as np
 from pathlib import Path 
 from os import path.join as join
@@ -26,9 +27,14 @@ class unet_dataset(Dataset):
 
         # Read images as torch tensor (Might need to fix)
         PIL2tensor = transforms.ToTensor() # Define PIL -> Tensor function 
-        im_in = PIL2tensor(Image.open(in_name))
-        im_out = PIL2tensor(Image.open(out_name))
-        return im_in, im_out
+        im_in = PIL2tensor(Image.open(in_name)).contiguous()
+        im_out = PIL2tensor(Image.open(out_name)).contiguous()
+
+        scaled_in, scaled_out = self.__rescale__(im_in,im_out)
+        return {
+            'Input' : scaled_in,
+            'GT' : scaled_out
+        }
         
     def __rescale__(self,im_in,im_out):
         '''
@@ -38,5 +44,18 @@ class unet_dataset(Dataset):
         scaled_out = (im_in-self.ymin)/(self.ymax-self.ymin)
 
         return scaled_in, scaled_out
-        
+
+# Layer loss function
+
+def layer_combined_loss(network,gt_batch,pred_batch):
+    # returns a compressed loss
+    d2_gt = network.forward_d2(gt_batch)
+    d2_pred = network.forward_d2(pred_batch)
+
+    d3_gt = network.forward_d3(gt_batch)
+    d3_pred = network.forward_d3(pred_batch)
+
+    return l1_loss(d2_gt,d2_pred)+l1_loss(d3_gt,d3_pred)
+
+
 

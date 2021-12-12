@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import unet_components as blk
+import helper
 
 # Full implementation of baseline unet using the component
 
@@ -42,6 +43,32 @@ class Unet(nn.Module):
 
         y = self.out_conv.forward(d4)
         return y
+    # Below are only for the intermediate loss
+    def forward_d3(self,x):
+        x1 = self.input_conv.forward(x)
+
+        e1 = self.encoder1.forward(x1)
+        e2 = self.encoder1.forward(e1)
+        e3 = self.encoder1.forward(e2)
+        e4 = self.encoder1.forward(e3)
+
+        d1 = self.decoder1.forward(e4,e3)
+        d2 = self.decoder2.forward(d1,e2)
+        d3 = self.decoder3.forward(d2,e1)
+        return d3
+
+    def forward_d2(self,x):
+        x1 = self.input_conv.forward(x)
+
+        e1 = self.encoder1.forward(x1)
+        e2 = self.encoder1.forward(e1)
+        e3 = self.encoder1.forward(e2)
+        e4 = self.encoder1.forward(e3)
+
+        d1 = self.decoder1.forward(e4,e3)
+        d2 = self.decoder2.forward(d1,e2)
+        return d2
+    
 
 
 
