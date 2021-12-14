@@ -39,9 +39,14 @@ class UpDecoder(nn.module):
         super.__init__()
     self.upsample = nn.ConvTranspose2d(kernel_size = 2, in_channels = self.in_channels, out_channels=self.out_channels, stride = 2)
     self.double_conv = DoubleConv(kernel_size = self.kernel_size, in_channels = self.in_channels, out_channels=self.out_channels)
-    def forward(self,x1,x2):
+    
+    def forward(self, x1, x2=None):
+        """
+        Remove the last skip connection
+        """
         y = self.upsample(x1)
-        y = torch.cat([x1,x2])
+        if x2 is not None:
+            y = torch.cat([x1,x2], dim=1)
         return self.double_conv(y)
         
         
