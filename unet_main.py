@@ -4,12 +4,20 @@ import numpy as np
 import unet_components as blk
 import helper
 
+from typing import List
+
+
 # Full implementation of baseline unet using the component
 
 class Unet(nn.Module):
-    def __init__(self,in_channels = 1, out_channels = 1, base_num_filter=32):
+    def __init__(self, 
+                 in_channels = 1, 
+                 out_channels = 1, 
+                 base_num_filter=32, 
+                 decoder_probe_points: List[int] = None ):
         super.__init__()
-
+        self.decoder_probe_points = decoder_probe_points
+        
         #-------- Input -------#
         self.input_conv = blk.DoubleConv(kernel_size=3, in_channels = self.in_channels, out_channels = self.base_num_filter)
 
@@ -17,10 +25,9 @@ class Unet(nn.Module):
         self.encoder1 = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter, out_channels = self.base_num_filter*2)
         self.encoder2 = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter*2, out_channels = self.base_num_filter*4)
         self.encoder3 = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter*4, out_channels = self.base_num_filter*8)
-        self.encoder4 = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter*8, out_channels = self.base_num_filter*16)
 
         #------ Bottleneck layer ------
-        
+        self.bottle_neck = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter*8, out_channels = self.base_num_filter*16)
         
         #------ Decoder -----#
         self.decoder1 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*16, out_channels = self.base_num_filter*8)
@@ -28,50 +35,33 @@ class Unet(nn.Module):
         self.decoder3 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*4, out_channels = self.base_num_filter*2)
         self.decoder4 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*2, out_channels = self.base_num_filter)
 
+        assert len(self.decoder_probe_points) == 4, f'Size of decoder probe points must be at most the number of decoder blocks'
+        for i in range(4):
+            assert -1 < self.decoder_probe_points[i] < 4, f'Expected decoder_probe_points at index {i} to be in the range [0, 3]'\
+            f', got {self.decoder_probe_points[i]}'
+        
         # ----- Output -------#
-        self.out_conv = blk. OutConv(in_channels = self.base_num_filter, out_channels = self.out_channels)
+        self.out_conv = blk.OutConv(in_channels = self.base_num_filter, out_channels = self.out_channels)
     
-    def forward(self,x):
-        x1 = self.input_conv.forward(x)
+    def forward(self, x):
+        x1 = self.input_conv(x)
 
-        e1 = self.encoder1.forward(x1)
-        e2 = self.encoder1.forward(e1)
-        e3 = self.encoder1.forward(e2)
-        e4 = self.encoder1.forward(e3)
+        e1 = self.encoder1(x1)
+        e2 = self.encoder1(e1)
+        e3 = self.encoder1(e2)
+        
+        bottle_neck = self.bottle_neck(e3)
 
-        d1 = self.decoder1.forward(e4,e3)
-        d2 = self.decoder2.forward(d1,e2)
-        d3 = self.decoder3.forward(d2,e1)
-        d4 = self.decoder4.forward(d3,x1)
-
+        d1 = self.decoder1(bottle_neck, e3)
+        d2 = self.decoder2(d1, e2)
+        d3 = self.decoder3(d2, e1)
+        d4 = self.decoder4(d3)
+        
+        decoder_block_outputs = [d1, d2, d3, d4]
+        decoder_block_intermediate_outputs = []
+        for block in self.decoder_probe_points:
+            decoder_block_intermediate_outputs.append(decoder_block_outputs[block])        
+        
         y = self.out_conv.forward(d4)
-        return y, 
-    # Below are only for the intermediate loss
-    def forward_d3(self,x):
-        x1 = self.input_conv.forward(x)
-
-        e1 = self.encoder1.forward(x1)
-        e2 = self.encoder1.forward(e1)
-        e3 = self.encoder1.forward(e2)
-        e4 = self.encoder1.forward(e3)
-
-        d1 = self.decoder1.forward(e4,e3)
-        d2 = self.decoder2.forward(d1,e2)
-        d3 = self.decoder3.forward(d2,e1)
-        return d3
-
-    def forward_d2(self,x):
-        x1 = self.input_conv.forward(x)
-
-        e1 = self.encoder1.forward(x1)
-        e2 = self.encoder1.forward(e1)
-        e3 = self.encoder1.forward(e2)
-        e4 = self.encoder1.forward(e3)
-
-        d1 = self.decoder1.forward(e4,e3)
-        d2 = self.decoder2.forward(d1,e2)
-        return d2
-    
-
-
+        return y, *decoder_block_intermediate_outputs
 
