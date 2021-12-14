@@ -19,6 +19,9 @@ class Unet(nn.Module):
         self.encoder3 = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter*4, out_channels = self.base_num_filter*8)
         self.encoder4 = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter*8, out_channels = self.base_num_filter*16)
 
+        #------ Bottleneck layer ------
+        
+        
         #------ Decoder -----#
         self.decoder1 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*16, out_channels = self.base_num_filter*8)
         self.decoder2 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*8, out_channels = self.base_num_filter*4)
@@ -42,7 +45,7 @@ class Unet(nn.Module):
         d4 = self.decoder4.forward(d3,x1)
 
         y = self.out_conv.forward(d4)
-        return y
+        return y, 
     # Below are only for the intermediate loss
     def forward_d3(self,x):
         x1 = self.input_conv.forward(x)
