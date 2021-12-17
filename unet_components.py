@@ -33,23 +33,15 @@ class DownEncoder(nn.Module):
 class UpDecoder(nn.Module):
     # This implementation involves Downsample (Maxpooling) followed by skip connection followed by a DoubleConv implementation
     # Warning : Everything is in same convolution.
-<<<<<<< HEAD
     def __init__(self, in_channels:int, out_channels:int, kernel_size = 3):
         super().__init__()
         self.upsample = nn.ConvTranspose2d(kernel_size = 2, in_channels = in_channels, out_channels= out_channels, stride = 2)
         self.double_conv = DoubleConv(kernel_size = kernel_size, in_channels = in_channels, out_channels=out_channels)
-=======
-    def __init__(self, kernel_size = 3, in_channels:int, out_channels:int):
-        super.__init__()
-    self.upsample = nn.ConvTranspose2d(kernel_size = 2, in_channels = self.in_channels, out_channels=self.out_channels, stride = 2)
-    self.double_conv = DoubleConv(kernel_size = self.kernel_size, in_channels = self.in_channels, out_channels=self.out_channels)
->>>>>>> df94d583b6dd3dfb760b1ce970a91de0ce0571d5
     
     def forward(self, x1, x2=None):
         """
         Remove the last skip connection
         """
-<<<<<<< HEAD
         
         x1 = self.upsample(x1)
         
@@ -60,11 +52,6 @@ class UpDecoder(nn.Module):
             x1 = nn.functional.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2])
             y = torch.cat([x2,x1], dim=1)
 
-=======
-        y = self.upsample(x1)
-        if x2 is not None:
-            y = torch.cat([x1,x2], dim=1)
->>>>>>> df94d583b6dd3dfb760b1ce970a91de0ce0571d5
         return self.double_conv(y)
         
         
