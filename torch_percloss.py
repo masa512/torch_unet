@@ -1,8 +1,8 @@
 import torch
 import torchvision as vision
-import torch.nn.functional.l1_loss as l1_loss
+from torch.nn.functional import l1_loss as l1_loss
 
-class Perceptual_loss(torch.nn.module):
+class Perceptual_loss(torch.nn.Module):
 	def __init__(self):
 		super(Perceptual_loss,self).__init__ # Invoke constructor of the parent class
 		# Break into four blocks [0:23]
