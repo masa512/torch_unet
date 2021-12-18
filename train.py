@@ -121,7 +121,7 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
                         criterion = Perceptual_loss().to(device=device)
                         loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
                     '''
-                    
+
                     criterion = torch.nn.MSELoss()
                     loss2 = criterion(gt_batch2,pred_batch2)
                     val_l += loss2
