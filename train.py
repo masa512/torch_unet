@@ -34,6 +34,7 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
     dataset = helper.unet_dataset(indir = path_img, outdir = path_img, xmin = -np.pi , xmax=np.pi, ymin = -np.pi , ymax=np.pi,transform=trans)
 
     # Step 2 : Split training/val
+    print(dataset)
     #train_set, val_set = random_split(dataset, [dataset.__len__()*r_train, dataset.__len__()*(1-r_train)], generator=torch.Generator().manual_seed(0))
     train_set, val_set = random_split(dataset, [80,20])
     #train_set = train_dataset
@@ -175,6 +176,52 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
     plt.plot(val_loss)
     plt.legend(["train","val"])
     plt.savefig('val_loss.png')
+        
+        
+
+
+    #======================Step 8 : Save validation outputs accordingly==================================
+    network.eval()
+
+    # Path to save images 
+    out_path = 'val_outputs'
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+    in_path = os.path.join(out_path,'in_img')
+    if not os.path.exists(in_path):
+        os.makedirs(in_path)
+    gt_path = os.path.join(out_path,'gt_img')
+    if not os.path.exists(gt_path):
+        os.makedirs(gt_path)
+    pred_path = os.path.join(out_path,'pred_img')
+    if not os.path.exists(pred_path):
+        os.makedirs(pred_path)
+
+    test_loss = []
+    with torch.no_grad():
+        for i, batch in enumerate(valloader):
+            input_batch = batch['Input'].to(device=device, dtype=torch.float32)
+            gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
+            pred_batch = network(input_batch)# Prediction output
+            '''
+            if Perceptual_loss:
+                    criterion = Perceptual_loss().to(device=device)
+                    loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
+            '''
+            if pix_loss:
+                criterion = torch.nn.MSELoss()
+                loss = criterion(gt_batch,pred_batch)
+            '''
+            if layer_loss:
+                loss += helper.layer_combined_loss(network = network,gt_batch = gt_batch,pred_batch = pred_batch)
+            '''
+            test_loss.append(loss)
+            print(input_batch.cpu().detach().numpy())
+            # Save image
+            imsave(os.path.join(in_path,'fuck.tif'),input_batch.cpu().detach().numpy())
+            imsave(os.path.join(gt_path,'fuck1.tif'),gt_batch.cpu().detach().numpy())
+            imsave(os.path.join(pred_path,'fuck2.tif'),pred_batch.cpu().detach().numpy())
+        
         
         
 

@@ -89,7 +89,6 @@ class unet_dataset(Dataset):
             'GT' : self.transform((im_out-self.yrange[0])/(self.yrange[1]-self.yrange[0]))
         }
 
-
 # Layer loss function
 
 def layer_combined_loss(gt_batch,pred_layer):
