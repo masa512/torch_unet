@@ -11,7 +11,7 @@ class LayerLoss(nn.Module):
     
     self.convs = []
     for i, channel in enumerate(in_channels):
-      self.convs.append(nn.Conv2d(channel,1,1,1))
+      self.convs.append(nn.Conv2d(channel,1,1,1, bias=False))
       self.add_module(f'layerLossConv_{i}', self.convs[-1])
      
     mse_loss = nn.MSELoss()
