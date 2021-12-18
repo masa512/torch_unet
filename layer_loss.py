@@ -6,12 +6,12 @@ import torch.nn as nn
 # - jack of all trades, masters of none, aka michael.
 
 class LayerLoss(nn.Module):
-  def __init__(self, in_channels: List[int]):
+  def __init__(self, num_inputs: int):
     super.__init__()
     
     self.convs = []
-    for i, channel in enumerate(in_channels):
-      self.convs.append(nn.Conv2d(channel,1,1,1))
+    for i in range(num_inputs):
+      self.convs.append(nn.LazyConv2d(1,1,1))
       self.add_module(f'layerLossConv_{i}', self.convs[-1])
      
     mse_loss = nn.MSELoss()
