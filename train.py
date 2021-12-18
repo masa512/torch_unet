@@ -13,6 +13,7 @@ from torchvision.datasets import MNIST as MNIST
 from unet_main import UNet
 from torch_percloss import Perceptual_loss
 from tifffile.tifffile import imsave
+import torch.nn.functional as F
 from layer_loss import LayerLoss
 
 
@@ -122,8 +123,7 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
                         loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
                     '''
                     
-                    criterion = torch.nn.MSELoss()
-                    loss2 = criterion(gt_batch2,pred_batch2)
+                    loss2 = F.mse_loss(gt_batch2,pred_batch2)
                     val_l += loss2
                 if i % accum_step is 0 and i is not 0:
                     val_loss.append(val_l/20)       
