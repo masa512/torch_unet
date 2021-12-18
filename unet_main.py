@@ -39,13 +39,12 @@ class UNet(nn.Module):
         self.decoder3 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*4, out_channels = self.base_num_filter*2)
         self.decoder4 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*2, out_channels = self.base_num_filter)
 
-        '''
+
         if decoder_probe_points is not None : 
             assert len(self.decoder_probe_points) == 4, f'Size of decoder probe points must be at most the number of decoder blocks'
             for i in range(4):
                 assert -1 < self.decoder_probe_points[i] < 4, f'Expected decoder_probe_points at index {i} to be in the range [0, 3]'\
                 f', got {self.decoder_probe_points[i]}'
-        '''
         
         # ----- Output -------#
         self.out_conv = blk.OutConv(in_channels = self.base_num_filter, out_channels = self.out_channels)
