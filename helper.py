@@ -8,9 +8,12 @@ import numpy as np
 from pathlib import Path 
 from os.path import join as join
 from os import listdir
+from os.path import splitext
 from PIL import Image 
+from tifffile import tifffile 
 import glob
 
+'''
 class unet_dataset(Dataset):
     def __init__(self, indir:str , outdir:str , xmin = 0, xmax = 1, ymin = 0, ymax = 1):
         self.indir = indir
@@ -18,8 +21,8 @@ class unet_dataset(Dataset):
         self.xrange = [xmin,xmax]
         self.yrange = [ymin,ymax]
         self.in_names = [splitext(file)[0] for file in listdir(indir) if not file.startswith('.')] # Extract the name before tif of input image as an ID
-    def __len__():
-        return len(names)
+    def __len__(self,idx):
+        return len(self.in_names)
     def __getitem__(self,idx):
         # This method returns dictionary of {in, out} pair given the idx AS TORCH TENSORS
         # The format is -> GT name = Input image just with z(idx) with idx(GT) =/= idx(input)
@@ -39,14 +42,51 @@ class unet_dataset(Dataset):
         }
         
     def __rescale__(self,im_in,im_out):
-        '''
-        This function rescales np image according to x,y range and outputs rescaled input and output image
-        '''
+
+        #This function rescales np image according to x,y range and outputs rescaled input and output image
+
         scaled_in = (im_in-self.xmin)/(self.xmax-self.xmin)
         scaled_out = (im_in-self.ymin)/(self.ymax-self.ymin)
 
         return scaled_in, scaled_out
+'''
 
+class unet_dataset(Dataset):
+    def __init__(self, indir:str , outdir:str , xmin = 0, xmax = 1, ymin = 0, ymax = 1,transform = None):
+        self.indir = indir
+        self.outdir = outdir
+        self.xrange = [xmin,xmax]
+        self.yrange = [ymin,ymax]
+        self.in_names = [splitext(file)[0] for file in listdir(indir) if not file.startswith('.')] # Extract the name before tif of input image as an ID
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.in_names)
+    def __getitem__(self,idx):
+        # This method returns dictionary of {in, out} pair given the idx AS TORCH TENSORS
+        # The format is -> GT name = Input image just with z(idx) with idx(GT) =/= idx(input)
+        # Find index in string to locate "z" and find string that matches substring right upto z
+        in_name = join(self.indir,self.in_names[idx]+'.tif')
+        out_name = in_name
+
+        # Read images as torch tensor (Might need to fix)
+        '''
+        im_in = tifffile.imread(in_name)
+        im_out = tifffile.imread(out_name)
+        print(im_in, im_out)
+        scaled_in, scaled_out = self.__rescale__(im_in,im_out)
+        return {
+            'Input' : scaled_in,
+            'GT' : scaled_out
+        }
+        '''
+        im_in = tifffile.imread(in_name)
+        im_out = tifffile.imread(out_name)
+        
+        return {
+            'Input' : self.transform((im_in-self.xrange[0])/(self.xrange[1]-self.xrange[0])),
+            'GT' : self.transform((im_out-self.yrange[0])/(self.yrange[1]-self.yrange[0]))
+        }
 
 
 # Layer loss function
