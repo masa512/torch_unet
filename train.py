@@ -81,7 +81,7 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
             #input_batch = helper.AddGaussNoise(0,0.1)(batch[0].to(device=device, dtype=torch.float32))
             input_batch = batch['Input'].to(device=device, dtype=torch.float32)
             gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
-            y, (intermediate) = network(input_batch)# Prediction output with layer
+            y, intermediate = network(input_batch)# Prediction output with layer
             
             loss = criterion(gt_batch, y, *intermediate)
             
