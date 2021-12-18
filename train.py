@@ -71,7 +71,7 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
 
     if layer_loss:
 #             loss += helper.layer_combined_loss(network = network,gt_batch = gtmid, pred_batch = ymid)
-        criterion = LayerLoss(3) # 2 intermediate and 1 for output
+        criterion = LayerLoss(3, device='cuda') # 2 intermediate and 1 for output
     
     for t in range(num_epochs):
         print(f"-------------------EPOCH {t}-----------------------")
