@@ -72,4 +72,4 @@ class UNet(nn.Module):
 
 
         y = self.out_conv(d4)
-        return y, *decoder_block_intermediate_outputs
+        return *decoder_block_intermediate_outputs, y
