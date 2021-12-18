@@ -67,7 +67,7 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
 
     if pix_loss:
         criterion = torch.nn.MSELoss()
-        loss = criterion(gt_batch,pred_batch)/accum_step
+        
 
     if layer_loss:
 #             loss += helper.layer_combined_loss(network = network,gt_batch = gtmid, pred_batch = ymid)
@@ -83,7 +83,11 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
             gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
             y, intermediate = network(input_batch)# Prediction output with layer
             
-            loss = criterion(gt_batch, y, *intermediate)
+            if layer_loss:
+                loss = criterion(gt_batch, y, *intermediate)
+            
+            if pix_loss:
+                loss = criterion(gt_batch,pred_batch)/accum_step
             
             # Backprop
 #             network.eval() # evaluation mode
