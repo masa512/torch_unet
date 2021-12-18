@@ -13,7 +13,7 @@ from torchvision.datasets import MNIST as MNIST
 from unet_main import UNet
 from torch_percloss import Perceptual_loss
 from tifffile.tifffile import imsave
-from LayerLoss import LayerLoss
+from layer_loss import LayerLoss
 
 
 def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_step: int = 20, learning_rate = 1E-4,r_train = 0.8,Perceptual_loss=True,pix_loss = False,layer_loss=False):
