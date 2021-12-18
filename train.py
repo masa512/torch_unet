@@ -130,28 +130,29 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
         os.makedirs(pred_path)
 
     test_loss = []
-    for i, batch in enumerate(valloader):
-        input_batch = batch['Input'].to(device=device, dtype=torch.float32)
-        gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
-        pred_batch = network(input_batch)# Prediction output
-        '''
-        if Perceptual_loss:
-                criterion = Perceptual_loss().to(device=device)
-                loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
-        '''
-        if pix_loss:
-            criterion = torch.nn.MSELoss()
-            loss = criterion(gt_batch,pred_batch)
-        '''
-        if layer_loss:
-            loss += helper.layer_combined_loss(network = network,gt_batch = gt_batch,pred_batch = pred_batch)
-        '''
-        test_loss.append(loss)
-        print(input_batch.cpu().detach().numpy())
-        # Save image
-        imsave(os.path.join(in_path,'fuck.tif'),input_batch.cpu().detach().numpy())
-        imsave(os.path.join(gt_path,'fuck1.tif'),gt_batch.cpu().detach().numpy())
-        imsave(os.path.join(pred_path,'fuck2.tif'),pred_batch.cpu().detach().numpy())
+    with torch.no_grad():
+        for i, batch in enumerate(valloader):
+            input_batch = batch['Input'].to(device=device, dtype=torch.float32)
+            gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
+            pred_batch = network(input_batch)# Prediction output
+            '''
+            if Perceptual_loss:
+                    criterion = Perceptual_loss().to(device=device)
+                    loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
+            '''
+            if pix_loss:
+                criterion = torch.nn.MSELoss()
+                loss = criterion(gt_batch,pred_batch)
+            '''
+            if layer_loss:
+                loss += helper.layer_combined_loss(network = network,gt_batch = gt_batch,pred_batch = pred_batch)
+            '''
+            test_loss.append(loss)
+            print(input_batch.cpu().detach().numpy())
+            # Save image
+            imsave(os.path.join(in_path,'fuck.tif'),input_batch.cpu().detach().numpy())
+            imsave(os.path.join(gt_path,'fuck1.tif'),gt_batch.cpu().detach().numpy())
+            imsave(os.path.join(pred_path,'fuck2.tif'),pred_batch.cpu().detach().numpy())
         
         
         
