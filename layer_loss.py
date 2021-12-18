@@ -7,7 +7,7 @@ import torch.nn as nn
 
 class LayerLoss(nn.Module):
   def __init__(self, num_inputs: int):
-    super.__init__()
+    super().__init__()
     
     self.convs = []
     for i in range(num_inputs):
