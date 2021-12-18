@@ -64,12 +64,12 @@ class UNet(nn.Module):
         d3 = self.decoder3(d2, e1)
         d4 = self.decoder4(d3,x1)
         
-        '''
+
         decoder_block_outputs = [d1, d2, d3, d4]
         decoder_block_intermediate_outputs = []
         for block in self.decoder_probe_points:
             decoder_block_intermediate_outputs.append(decoder_block_outputs[block])        
-        '''
+
 
         y = self.out_conv(d4)
-        return y#, *decoder_block_intermediate_outputs
+        return y, *decoder_block_intermediate_outputs
