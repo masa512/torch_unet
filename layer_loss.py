@@ -17,9 +17,10 @@ class LayerLoss(nn.Module):
     mse_loss = nn.MSELoss()
     
   
-  def forward(self, target, *_input):
+  def forward(self, target, y, *_input):
     l = 0
     for i, _in in enumerate(_input):
       t = torchvision.transforms.functional.resize(target, _in.shape[2:])
       l = l + mse_loss(self.convs[i](_in), t)
+    l = l + mse_loss(y, target)
     return l
