@@ -263,8 +263,8 @@ if __name__ == '__main__':
                 learning_rate = 1E-4,
                 r_train = 0.8,
                 Perceptual_loss=False,
-                pix_loss = True,
-                layer_loss=False
+                pix_loss = False,
+                layer_loss=True
                 )
 
     

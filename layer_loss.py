@@ -7,20 +7,20 @@ import torch.nn as nn
 
 class LayerLoss(nn.Module):
   def __init__(self, num_inputs: int):
-    super.__init__()
+    super().__init__()
     
     self.convs = []
     for i in range(num_inputs):
       self.convs.append(nn.LazyConv2d(1,1,1))
       self.add_module(f'layerLossConv_{i}', self.convs[-1])
      
-    mse_loss = nn.MSELoss()
+    self.mse_loss = nn.MSELoss()
     
   
   def forward(self, target, y, *_input):
     l = 0
     for i, _in in enumerate(_input):
       t = torchvision.transforms.functional.resize(target, _in.shape[2:])
-      l = l + mse_loss(self.convs[i](_in), t)
-    l = l + mse_loss(y, target)
+      l = l + self.mse_loss(self.convs[i](_in), t)
+    l = l + self.mse_loss(y, target)
     return l

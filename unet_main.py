@@ -17,7 +17,7 @@ class UNet(nn.Module):
                  ):
 
         super(UNet, self).__init__()
-        #self.decoder_probe_points = decoder_probe_points
+        self.decoder_probe_points = decoder_probe_points
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.base_num_filter = base_num_filter
@@ -41,8 +41,8 @@ class UNet(nn.Module):
 
 
         if decoder_probe_points is not None : 
-            assert len(self.decoder_probe_points) == 4, f'Size of decoder probe points must be at most the number of decoder blocks'
-            for i in range(4):
+            assert len(self.decoder_probe_points) <= 4, f'Size of decoder probe points must be at most the number of decoder blocks'
+            for i in range(len(self.decoder_probe_points)):
                 assert -1 < self.decoder_probe_points[i] < 4, f'Expected decoder_probe_points at index {i} to be in the range [0, 3]'\
                 f', got {self.decoder_probe_points[i]}'
         
