@@ -58,24 +58,24 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
 
     num_batches = train_set.__len__()//batch_size
 
+    # Define three loss functions : Perceptual, pixel-wise loss, layer-wise loss
+    '''
+    if Perceptual_loss:
+        criterion = Perceptual_loss().to(device=device)
+        loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
+    '''
+
+    if pix_loss:
+        criterion = torch.nn.MSELoss()
+        loss = criterion(gt_batch,pred_batch)/accum_step
+
+    if layer_loss:
+#             loss += helper.layer_combined_loss(network = network,gt_batch = gtmid, pred_batch = ymid)
+        criterion = LayerLoss(3) # 2 intermediate and 1 for output
+    
     for t in range(num_epochs):
         print(f"-------------------EPOCH {t}-----------------------")
         network.train() # Training mode
-        
-        # Define three loss functions : Perceptual, pixel-wise loss, layer-wise loss
-        '''
-        if Perceptual_loss:
-            criterion = Perceptual_loss().to(device=device)
-            loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
-        '''
-        
-        if pix_loss:
-            criterion = torch.nn.MSELoss()
-            loss = criterion(gt_batch,pred_batch)/accum_step
-
-        if layer_loss:
-#             loss += helper.layer_combined_loss(network = network,gt_batch = gtmid, pred_batch = ymid)
-            criterion = LayerLoss(3) # 2 intermediate and 1 for output
         
         for i, batch in enumerate(trainloader):# Extract one permutation of training data on the GPU
             #input_batch = helper.AddGaussNoise(0,0.1)(batch[0].to(device=device, dtype=torch.float32))
