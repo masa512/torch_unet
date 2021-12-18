@@ -9,17 +9,17 @@ class LayerLoss(nn.Module):
   def __init__(self, in_channels: List[int]):
     super.__init__()
     
-    self.conv_channels = []
+    self.convs = []
     for i, channel in enumerate(in_channels):
-      self.conv_channels.append(nn.Conv2d(channel,1,1,1))
-      self.add_module(f'layerLossConv_{i}', self.conv_channels[-1])
+      self.convs.append(nn.Conv2d(channel,1,1,1))
+      self.add_module(f'layerLossConv_{i}', self.convs[-1])
      
     mse_loss = nn.MSELoss()
     
   
   def forward(self, target, *_input):
     l = 0
-    for _in in _input:
+    for i, _in in enumerate(_input):
       t = torchvision.transforms.functional.resize(target, _in.shape[2:])
-      l = l + mse_loss(, t)
-      
+      l = l + mse_loss(self.convs[i](_in), t)
+    return l
