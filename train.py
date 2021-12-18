@@ -250,7 +250,7 @@ if __name__ == '__main__':
                  decoder_probe_points = None 
                  )
     '''
-    network = UNet()
+    network = UNet(decoder_probe_points = [1,3])
 
     if torch.cuda.is_available():
         print(f"The CUDA GPU IS USED with msg {torch.cuda.is_available()}")
