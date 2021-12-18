@@ -13,6 +13,7 @@ from torchvision.datasets import MNIST as MNIST
 from unet_main import UNet
 from torch_percloss import Perceptual_loss
 from tifffile.tifffile import imsave
+from LayerLoss import LayerLoss
 
 
 def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_step: int = 20, learning_rate = 1E-4,r_train = 0.8,Perceptual_loss=True,pix_loss = False,layer_loss=False):
@@ -60,29 +61,32 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
     for t in range(num_epochs):
         print(f"-------------------EPOCH {t}-----------------------")
         network.train() # Training mode
+        
+        # Define three loss functions : Perceptual, pixel-wise loss, layer-wise loss
+        '''
+        if Perceptual_loss:
+            criterion = Perceptual_loss().to(device=device)
+            loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
+        '''
+        
+        if pix_loss:
+            criterion = torch.nn.MSELoss()
+            loss = criterion(gt_batch,pred_batch)/accum_step
+
+        if layer_loss:
+#             loss += helper.layer_combined_loss(network = network,gt_batch = gtmid, pred_batch = ymid)
+            criterion = LayerLoss(3) # 2 intermediate and 1 for output
+        
         for i, batch in enumerate(trainloader):# Extract one permutation of training data on the GPU
             #input_batch = helper.AddGaussNoise(0,0.1)(batch[0].to(device=device, dtype=torch.float32))
             input_batch = batch['Input'].to(device=device, dtype=torch.float32)
             gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
-            pred_batch, ymid = network(input_batch)# Prediction output with layer
+            out = network(input_batch)# Prediction output with layer
             
-            # Define three loss functions : Perceptual, pixel-wise loss, layer-wise loss
-            '''
-            if Perceptual_loss:
-                criterion = Perceptual_loss().to(device=device)
-                loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
-            '''
-
-            if pix_loss:
-                criterion = torch.nn.MSELoss()
-                loss = criterion(gt_batch,pred_batch)/accum_step
-
-            if layer_loss:
-                loss += helper.layer_combined_loss(network = network,gt_batch = gtmid, pred_batch = ymid)
-
-
+            loss = criterion(gt_batch, *out)
+            
             # Backprop
-            network.eval() # evaluation mode
+#             network.eval() # evaluation mode
             '''
             for batch in valloader:
                 input_batch = helper.AddGaussianNoise(0,0.1)(batch[0].to(device=device, dtype=torch.float32))
@@ -95,10 +99,10 @@ def train_unet(network, device, num_epochs: int = 2,batch_size: int = 1, accum_s
             '''
             loss.backward()
             # If multiple of accum step -> update the parameters and zero_grad 
-            if i % accum_step is 0 and i is not 0:
-                train_loss.append(loss)
+            if i % accum_step == 0 and i != 0:
+                train_loss.append(loss.item())
                 optimizer.step()
-                optimizer.zero_grad(set_to_none=True)
+                optimizer.zero_grad()
             
             with torch.no_grad():
                 val_l = 0
