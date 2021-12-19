@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.datasets import MNIST
 from torchvision import transforms
+import torch.nn as nn 
 import torch.nn
 from torch.nn.functional import l1_loss as l1_loss
 import numpy as np
@@ -12,7 +13,9 @@ from os import listdir
 from os.path import splitext
 from PIL import Image 
 from tifffile import tifffile 
+from typing import List
 import glob
+import pandas as pd
 
 '''
 class unet_dataset(Dataset):
@@ -53,40 +56,29 @@ class unet_dataset(Dataset):
 '''
 
 class unet_dataset(Dataset):
-    def __init__(self, indir:str , outdir:str , xmin = 0, xmax = 1, ymin = 0, ymax = 1,transform = None):
-        self.indir = indir
-        self.outdir = outdir
+    def __init__(self, dir:str , xmin = 0, xmax = 1, ymin = 0, ymax = 1,transform = None):
+        self.dir = dir
         self.xrange = [xmin,xmax]
         self.yrange = [ymin,ymax]
-        self.in_names = [splitext(file)[0] for file in listdir(indir) if not file.startswith('.')] # Extract the name before tif of input image as an ID
         self.transform = transform
+        self.dataset_list = pd.read_csv(join(dir,'train_12_19_2021.csv'), header=None).values.tolist()
 
     def __len__(self):
-        return len(self.in_names)
+        return len(self.dataset_list)
     def __getitem__(self,idx):
         # This method returns dictionary of {in, out} pair given the idx AS TORCH TENSORS
         # The format is -> GT name = Input image just with z(idx) with idx(GT) =/= idx(input)
         # Find index in string to locate "z" and find string that matches substring right upto z
-        in_name = join(self.indir,self.in_names[idx]+'.tif')
-        out_name = in_name
+        in_name = join(self.dir,'Out_Of_Focus',self.dataset_list[idx][0])
+        out_name = join(self.dir,'In_Focus',self.dataset_list[idx][1])
 
         # Read images as torch tensor (Might need to fix)
-        '''
-        im_in = tifffile.imread(in_name)
-        im_out = tifffile.imread(out_name)
-        print(im_in, im_out)
-        scaled_in, scaled_out = self.__rescale__(im_in,im_out)
-        return {
-            'Input' : scaled_in,
-            'GT' : scaled_out
-        }
-        '''
         im_in = tifffile.imread(in_name)
         im_out = tifffile.imread(out_name)
         
         return {
-            'Input' : self.transform((im_in-self.xrange[0])/(self.xrange[1]-self.xrange[0])),
-            'GT' : self.transform((im_out-self.yrange[0])/(self.yrange[1]-self.yrange[0]))
+            'Input' : self.transform((im_in+np.pi)/(2*np.pi)),
+            'GT' : self.transform((im_out+np.pi)/(2*np.pi))
         }
 
 # Layer loss function
@@ -106,6 +98,34 @@ class AddGaussNoise():
         self.std = std
     def __call__(self,tensor): # takes in tensor AddGaussNoise()(tensor)
         return tensor + torch.randn(tensor.size()) * self.std + self.mean
+
+class SSIM_loss(nn.Module):
+    def __init__(self,windowed:bool = False, k1 = 0.01, k2 = 0.03, bit_depth:int = 32):
+        super().__init__()
+        self.windowed = windowed
+        self.c1 = (k1*(2**bit_depth-1))**2
+        self.c2 = (k2*(2**bit_depth-1))**2
+    def forward(self,y,p):
+        if not self.windowed: # For now!
+            mup = torch.mean(p)
+            muy = torch.mean(y)
+            sigy = torch.std(y)
+            sigp = torch.std(p)
+            sigyp = torch.mean((y-muy)*(p-mup))
+            return 1- ((2*mup*muy+self.c1)*(2*sigyp+self.c2))/((mup**2+muy**2+self.c1)*(sigy**2+sigp**2+self.c2))
+
+class pearson_loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self,x,y):
+        # std x and std y and covariance 
+        numerator = torch.sum((x-x.mean())*(y-y.mean()))
+        denominator =torch.sqrt(torch.sum((x-x.mean())**2)*torch.sum((y-y.mean())**2))
+        return 1-numerator/denominator
+
+
+
+
 
 
 
