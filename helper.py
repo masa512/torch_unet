@@ -16,6 +16,8 @@ from tifffile import tifffile
 from typing import List
 import glob
 import pandas as pd
+from scipy.signal import medfilt
+from torch.fft import fft
 
 '''
 class unet_dataset(Dataset):
@@ -72,13 +74,25 @@ class unet_dataset(Dataset):
         in_name = join(self.dir,'Out_Of_Focus',self.dataset_list[idx][0])
         out_name = join(self.dir,'In_Focus',self.dataset_list[idx][1])
 
+        # Separate idx and evaluate didx
+        z_in = self.dataset_list[idx][0].split("_z")[1].split("_m")[0]
+        z_out = self.dataset_list[idx][1].split("_z")[1].split("_m")[0]
+
         # Read images as torch tensor (Might need to fix)
-        im_in = tifffile.imread(in_name)
-        im_out = tifffile.imread(out_name)
+        rescaled_in = medfilt(((tifffile.imread(in_name)+np.pi)/(2*np.pi)),kernel_size = 3)
+        rescaled_out = medfilt(((tifffile.imread(out_name)+np.pi)/(2*np.pi)),kernel_size = 3)
+        im_in = self.transform(rescaled_in.astype('float32'))
+        im_out = self.transform(rescaled_out.astype('float32'))
+
+        # GET FFT and stack as real : 
+        fft_in = torch.cat((torch.real(fft(im_in)),torch.imag(fft(im_in))),dim=0)
+
         
         return {
-            'Input' : self.transform((im_in+np.pi)/(2*np.pi)),
-            'GT' : self.transform((im_out+np.pi)/(2*np.pi))
+            'Input' : im_in,
+            'GT' : im_out,
+            'FFT_in' : fft_in,
+            'delZ' : int(z_in)-int(z_out)
         }
 
 # Layer loss function
