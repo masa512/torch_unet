@@ -60,8 +60,8 @@ class UNet(nn.Module):
 
         d1 = self.decoder1(bottle_neck, e3)
         d2 = self.decoder2(d1, e2)
-        d3 = self.decoder3(d2, e1)
-        d4 = self.decoder4(d3,x1)
+        d3 = self.decoder3(d2, None) # Remove skip
+        d4 = self.decoder4(d3,None) # Remove skip
         
 
         decoder_block_outputs = [d1, d2, d3, d4]

@@ -19,7 +19,7 @@ from layer_loss import LayerLoss
 
 def train_unet(network,
                 device, 
-                num_epochs: int = 2,
+                num_epochs: int = 1,
                 batch_size: int = 1, 
                 accum_step: int = 50, 
                 learning_rate = 1E-4,
@@ -73,16 +73,13 @@ def train_unet(network,
     num_batches = train_set.__len__()//batch_size
 
     # Define three loss functions : Perceptual, pixel-wise loss, layer-wise loss
-    '''
+    
     if Perceptual_loss:
         criterion = Perceptual_loss().to(device=device)
-        loss = criterion(yhat=pred_batch,y=gt_batch,blocks=[0, 0, 1, 0])
-    '''
 
     if pix_loss:
         criterion = torch.nn.MSELoss()
         
-
     if layer_loss:
 #             loss += helper.layer_combined_loss(network = network,gt_batch = gtmid, pred_batch = ymid)
         criterion = LayerLoss(3, device='cuda') # 2 intermediate and 1 for output
@@ -102,6 +99,10 @@ def train_unet(network,
             
             if pix_loss:
                 loss = criterion(gt_batch,y)/accum_step
+            
+            if Perceptual_loss:
+                loss = criterion(yhat=y,y=gt_batch,blocks=[0, 0, 1, 0])
+
             
             # Backprop
 #             network.eval() # evaluation mode
