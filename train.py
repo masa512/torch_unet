@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, random_split
 import numpy as np
 import helper
-from torch_percloss import Perceptual_loss
+from torch_percloss import Perceptual_loss as percloss
 import torchvision.transforms as transforms
 from torchvision.datasets import MNIST as MNIST
 from unet_main import UNet
@@ -43,7 +43,7 @@ def train_unet(network,
 
     # Path to the dataset
     path_img = r"/home/qli/Desktop/Masa/Hela_data"
-    dataset = helper.unet_dataset(indir = path_img, outdir = path_img, xmin = -np.pi , xmax=np.pi, ymin = -np.pi , ymax=np.pi,transform=trans)
+    dataset = helper.unet_dataset(dir = path_img, xmin = -np.pi , xmax=np.pi, ymin = -np.pi , ymax=np.pi,transform=trans)
 
     # Step 2 : Split training/val
     print(dataset)
@@ -75,8 +75,7 @@ def train_unet(network,
     # Define three loss functions : Perceptual, pixel-wise loss, layer-wise loss
     
     if Perceptual_loss:
-        criterion = Perceptual_loss().to(device=device)
-
+        criterion = percloss().to(device=device)
     if pix_loss:
         criterion = torch.nn.MSELoss()
         
@@ -220,9 +219,9 @@ if __name__ == '__main__':
                 batch_size = 1,
                 learning_rate = 1E-4,
                 r_train = 0.8,
-                Perceptual_loss=False,
+                Perceptual_loss=True,
                 pix_loss = False,
-                layer_loss=True
+                layer_loss=False
                 )
 
     

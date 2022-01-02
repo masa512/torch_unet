@@ -51,8 +51,9 @@ class UpDecoder(nn.Module):
 
             x1 = nn.functional.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2])
             y = torch.cat([x2,x1], dim=1)
-
-        return self.double_conv(y)
+            return self.double_conv(y)
+        return x1
+        
         
         
 class OutConv(nn.Module):
