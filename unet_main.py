@@ -83,9 +83,9 @@ class UNet(nn.Module):
         bottle_neck = self.bottle_neck(e3)
 
         d1 = self.decoder1(bottle_neck, e3)
-        d2 = self.decoder2(d1, None)  # Removed skip originally e2
-        d3 = self.decoder3(d2, None)  # Remove skip originally e1
-        d4 = self.decoder4(d3, None)  # Remove skip originally x1
+        d2 = self.decoder2(d1, e2)  # Removed skip originally e2
+        d3 = self.decoder3(d2, e1)  # Remove skip originally e1
+        d4 = self.decoder4(d3, x1)  # Remove skip originally x1
 
         decoder_block_outputs = [d1, d2, d3, d4]
         decoder_block_intermediate_outputs = []

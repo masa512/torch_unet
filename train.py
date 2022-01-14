@@ -120,8 +120,16 @@ def train_unet(network,
             for j, batch_val in enumerate(valloader):# Extract one permutation of training data on the GPU
                 input_batch_val = batch_val['Input'].to(device=device, dtype=torch.float32)
                 gt_batch_val = batch_val['GT'].to(device=device, dtype=torch.float32)
-                pred_batch_val = network(input_batch_val)# Prediction output              
-                loss_val = F.mse_loss(gt_batch_val, pred_batch_val[0])
+                pred_batch_val = network(input_batch_val)# Prediction output
+                loss_val = 0
+                if layer_loss:
+                    loss_val += losses['layer loss'](gt_batch, y, *intermediate) 
+                if pix_loss:
+                    loss_val += 1*losses['mse'](gt_batch,y)
+                    loss_val += 1*losses['ssim'](gt_batch,y)
+                    loss_val += 4*losses['pearson'](gt_batch,y)
+                if Perceptual_loss:
+                    loss_val += losses['perceptual loss'](yhat=y,y=gt_batch,blocks=[0, 1, 0, 0])              
                 val_l += loss_val
             val_loss.append(val_l.item()/valloader.__len__())    
         deltat = time.time()-ti
@@ -183,7 +191,7 @@ def train_unet(network,
 # MAIN FUNCTION
 if __name__ == '__main__':
 
-    network = UNet(decoder_probe_points = [1,3],do_sqNex = False)
+    network = UNet(decoder_probe_points = [1,3],do_sqNex = True)
 
     if torch.cuda.is_available():
         print(f"The CUDA GPU IS USED with msg {torch.cuda.is_available()}")
@@ -192,10 +200,10 @@ if __name__ == '__main__':
     train_unet(network=network, 
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
                 num_epochs = 50,
-                batch_size = 7,
+                batch_size = 5,
                 learning_rate = 4.5E-4,
                 r_train = 0.8,
-                Perceptual_loss=False,
+                Perceptual_loss=True,
                 pix_loss = True,
                 layer_loss=False
                 )
