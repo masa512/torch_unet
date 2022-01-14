@@ -57,7 +57,7 @@ class unet_dataset(Dataset):
         return scaled_in, scaled_out
 '''
 
-class unet_dataset(Dataset):
+class unet_dataset(Dataset): # For the focus dataset 
     def __init__(self, dir:str , xmin = 0, xmax = 1, ymin = 0, ymax = 1,transform = None):
         self.dir = dir
         self.xrange = [xmin,xmax]
@@ -71,7 +71,7 @@ class unet_dataset(Dataset):
         # This method returns dictionary of {in, out} pair given the idx AS TORCH TENSORS
         # The format is -> GT name = Input image just with z(idx) with idx(GT) =/= idx(input)
         # Find index in string to locate "z" and find string that matches substring right upto z
-        in_name = join(self.dir,'Out_Of_Focus',self.dataset_list[idx][0])
+        in_name = join(self.dir,'Out_Of_Focus/processed',self.dataset_list[idx][0])
         out_name = join(self.dir,'In_Focus',self.dataset_list[idx][1])
 
         # Separate idx and evaluate didx
@@ -79,15 +79,16 @@ class unet_dataset(Dataset):
         z_out = self.dataset_list[idx][1].split("_z")[1].split("_m")[0]
 
         # Read images as torch tensor (Might need to fix)
-        rescaled_in = medfilt(((tifffile.imread(in_name)+np.pi)/(2*np.pi)),kernel_size = 3)
-        rescaled_out = medfilt(((tifffile.imread(out_name)+np.pi)/(2*np.pi)),kernel_size = 3)
+        #rescaled_in = medfilt(((tifffile.imread(in_name)+np.pi)/(2*np.pi)),kernel_size = 3)
+        #rescaled_out = medfilt(((tifffile.imread(out_name)+np.pi)/(2*np.pi)),kernel_size = 3)
+        rescaled_in = (tifffile.imread(in_name) + np.pi) / (2 * np.pi)
+        #rescaled_out = (tifffile.imread(out_name) + np.pi) / (2 * np.pi)
+        rescaled_out = (tifffile.imread(out_name) + np.pi) / (2 * np.pi)
         im_in = self.transform(rescaled_in.astype('float32'))
         im_out = self.transform(rescaled_out.astype('float32'))
 
         # GET FFT and stack as real : 
         fft_in = torch.cat((torch.real(fft(im_in)),torch.imag(fft(im_in))),dim=0)
-
-        
         return {
             'Input' : im_in,
             'GT' : im_out,

@@ -31,7 +31,7 @@ def train_unet(network,
                 layer_loss=False):
 
     # Step 1 : Load dataset and load model to device
-    network.to(device=device)
+    network.to('cuda')
     # Save location 
     project_name = "Focus"
     dir_name = project_name + time.strftime("%Y%m%d-%H%M%S")
@@ -47,7 +47,7 @@ def train_unet(network,
                                ])
 
     # Path to the dataset
-    path_img = r"/home/qli/Desktop/Masa/Hela_data"
+    path_img = r"./../Hela_data"
     dataset = helper.unet_dataset(dir = path_img, xmin = -np.pi , xmax=np.pi, ymin = -np.pi , ymax=np.pi, transform=trans)
 
     # Step 2 : Split training/val
@@ -83,28 +83,31 @@ def train_unet(network,
     # Training Begins
     best_val_loss = 1000 # anything high to begin with 
     for t in range(num_epochs):
-        print(f"-------------------EPOCH {t}-----------------------")
-        
+        print(f"-------------------EPOCH {t+1}-----------------------")
+
+        network.train()  # Training mode
         epoch_loss = []
         ti = time.time()
-        for i, batch in enumerate(tqdm(trainloader)):# Extract one permutation of training data on the GPU
-            network.train() # Training mode
-            input_batch = batch['Input'].to(device=device, dtype=torch.float32)
-            gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
+        for i, batch in enumerate(trainloader):# Extract one permutation of training data on the GPU
+            print(f"Batch {i+1}/{trainloader.__len__()}",end='\r')
+            input_batch = batch['Input'].to('cuda')
+            gt_batch = batch['GT'].to('cuda')
             y, intermediate = network(input_batch)# Prediction output with layer tuple
+            end_time = time.time()
             
             loss = 0
             if layer_loss:
                 loss += losses['layer loss'](gt_batch, y, *intermediate) 
             if pix_loss:
-                loss += losses['mse'](gt_batch,y)
-                loss += losses['ssim'](gt_batch,y)
-                loss += losses['pearson'](gt_batch,y)
+                loss += 1*losses['mse'](gt_batch,y)
+                loss += 1*losses['ssim'](gt_batch,y)
+                loss += 4*losses['pearson'](gt_batch,y)
             if Perceptual_loss:
-                loss += losses['perceptual loss'](yhat=y,y=gt_batch,blocks=[0, 0, 1, 0])
+                loss += losses['perceptual loss'](yhat=y,y=gt_batch,blocks=[0, 1, 0, 0])
             
             loss.backward() # Accumulate gradient
             epoch_loss.append(loss.item()) # Add current batch loss
+            #print(f'\r loss: {epoch_loss[-1]}', end='   ')
             # If multiple of accum step -> update the parameters and zero_grad 
             if (i+1) % accum_step == 0 or i+1 == len(trainloader):
                 optimizer.step()
@@ -120,12 +123,12 @@ def train_unet(network,
                 pred_batch_val = network(input_batch_val)# Prediction output              
                 loss_val = F.mse_loss(gt_batch_val, pred_batch_val[0])
                 val_l += loss_val
-            val_loss.append(val_l/valloader.__len__())    
+            val_loss.append(val_l.item()/valloader.__len__())    
         deltat = time.time()-ti
         train_loss.append(sum(epoch_loss)/len(epoch_loss))    
-        print(f'===> Epoch {t}: Train Loss -> {train_loss[-1]}')
-        print(f'===> Epoch {t}: Validation Loss -> {val_loss[-1]}')
-        print(f"====> epoch{t}: Time elapsed = {deltat//60}mins")
+        print(f'===> Epoch {t+1}: Train Loss -> {train_loss[-1]}')
+        print(f'===> Epoch {t+1}: Validation Loss -> {val_loss[-1]}')
+        print(f"====> epoch{t+1}: Time elapsed = {deltat//60}mins {deltat%60} secs")
 
         if (t+1)%5 == 0 and t < num_epochs-1 and val_loss[-1] < best_val_loss: # If best validation loss so far -> Save the model
             torch.save(network.state_dict(), os.path.join(dir_name,f'model_epoch{t+1}.pt'))
@@ -163,9 +166,9 @@ def train_unet(network,
             gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
             pred_batch = network(input_batch)# Prediction output
             # Save image
-            imsave(os.path.join(in_path,f'image{i}.tif'),input_batch.cpu().detach().numpy())
-            imsave(os.path.join(gt_path,f'image{i}.tif'),gt_batch.cpu().detach().numpy())
-            imsave(os.path.join(pred_path,f'image{i}.tif'),pred_batch[0].cpu().detach().numpy())
+            imsave(os.path.join(in_path,f'image{i}.tif'),input_batch.cpu().detach().numpy()[0,:,:,:])
+            imsave(os.path.join(gt_path,f'image{i}.tif'),gt_batch.cpu().detach().numpy()[0,:,:,:])
+            imsave(os.path.join(pred_path,f'image{i}.tif'),pred_batch[0].cpu().detach().numpy()[0,:,:,:])
 
     # Save plots
     plt.plot(train_loss)
@@ -180,7 +183,7 @@ def train_unet(network,
 # MAIN FUNCTION
 if __name__ == '__main__':
 
-    network = UNet(decoder_probe_points = [1,3])
+    network = UNet(decoder_probe_points = [1,3],do_sqNex = False)
 
     if torch.cuda.is_available():
         print(f"The CUDA GPU IS USED with msg {torch.cuda.is_available()}")
@@ -188,13 +191,13 @@ if __name__ == '__main__':
         print("GPU not really working: Running with CPU")
     train_unet(network=network, 
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
-                num_epochs = 30,
-                batch_size = 2,
-                learning_rate = 4E-4,
+                num_epochs = 50,
+                batch_size = 7,
+                learning_rate = 4.5E-4,
                 r_train = 0.8,
                 Perceptual_loss=False,
-                pix_loss = False,
-                layer_loss=True
+                pix_loss = True,
+                layer_loss=False
                 )
 
     
