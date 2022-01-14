@@ -96,6 +96,7 @@ def train_unet(network,
             end_time = time.time()
             
             loss = 0
+            # When empty just do mse by default
             if layer_loss:
                 loss += losses['layer loss'](gt_batch, y, *intermediate) 
             if pix_loss:
@@ -205,7 +206,9 @@ if __name__ == '__main__':
                 r_train = 0.8,
                 Perceptual_loss=True,
                 pix_loss = True,
-                layer_loss=False
+                layer_loss=False,
+                loss_functions = ['mse','pearson','ssim','Perceptual_loss'],
+                weights = [1,2,1,1]
                 )
 
     
