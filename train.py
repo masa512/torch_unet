@@ -17,6 +17,7 @@ import torch.nn.functional as F
 from layer_loss import LayerLoss
 from tqdm import tqdm
 import time 
+import json
 
 
 def train_unet(network,
@@ -26,9 +27,10 @@ def train_unet(network,
                 accum_step: int = 50, 
                 learning_rate = 1E-4,
                 r_train = 0.8,
-                Perceptual_loss=True,
-                pix_loss = False,
-                layer_loss=False):
+                loss_functions: str = [],
+                loss_weights = [],
+                perc_block = [0,0,0,0]
+                ):
 
     # Step 1 : Load dataset and load model to device
     network.to('cuda')
@@ -97,14 +99,19 @@ def train_unet(network,
             
             loss = 0
             # When empty just do mse by default
-            if layer_loss:
-                loss += losses['layer loss'](gt_batch, y, *intermediate) 
-            if pix_loss:
-                loss += 1*losses['mse'](gt_batch,y)
-                loss += 1*losses['ssim'](gt_batch,y)
-                loss += 4*losses['pearson'](gt_batch,y)
-            if Perceptual_loss:
-                loss += losses['perceptual loss'](yhat=y,y=gt_batch,blocks=[0, 1, 0, 0])
+            if not loss_functions:
+                raise Exception("You can't optimize without loss function rite? ;-)")
+            elif len(loss_functions) != len(loss_weights):
+                raise Exception("Length of the loss fnc and weight used are DIFF")
+            else:
+                for i, loss_fnx in enumerate(loss_functions):
+                    if loss_fnx == 'layer loss':
+                        loss += loss_weights[i]*losses[loss_fnx](gt_batch,*intermediate)
+                    elif loss == 'perceptual loss':
+                        loss += loss_weights[i]*losses[loss_fnx](gt_batch,y,blocks=perc_block)                   
+                    else:
+                        loss += loss_weights[i]*losses[loss_fnx](gt_batch,y)
+        
             
             loss.backward() # Accumulate gradient
             epoch_loss.append(loss.item()) # Add current batch loss
@@ -123,14 +130,17 @@ def train_unet(network,
                 gt_batch_val = batch_val['GT'].to(device=device, dtype=torch.float32)
                 pred_batch_val = network(input_batch_val)# Prediction output
                 loss_val = 0
-                if layer_loss:
-                    loss_val += losses['layer loss'](gt_batch, y, *intermediate) 
-                if pix_loss:
-                    loss_val += 1*losses['mse'](gt_batch,y)
-                    loss_val += 1*losses['ssim'](gt_batch,y)
-                    loss_val += 4*losses['pearson'](gt_batch,y)
-                if Perceptual_loss:
-                    loss_val += losses['perceptual loss'](yhat=y,y=gt_batch,blocks=[0, 1, 0, 0])              
+                # When empty just do mse by default
+                if not loss_functions:
+                    raise Exception("You can't optimize without loss function rite? ;-)")
+                elif len(loss_functions) != len(loss_weights):
+                    raise Exception("Length of the loss fnc and weight used are DIFF")
+                else:
+                    for i, loss_fnx in enumerate(loss_functions):
+                        if loss_fnx == 'layer loss':
+                            loss_val += loss_weights[i]*loss_fnx[loss](gt_batch,*intermediate)                
+                        else:
+                            loss_val += loss_weights[i]*loss_fnx[loss](gt_batch,y)         
                 val_l += loss_val
             val_loss.append(val_l.item()/valloader.__len__())    
         deltat = time.time()-ti
@@ -187,7 +197,21 @@ def train_unet(network,
     plt.savefig(os.path.join(dir_name,'val_loss.png'))
     plt.close()
 
-        
+    # Update the training summary to json file
+    args = {
+        'Save Folder': dir_name,
+        'Number of Epochs': num_epochs,
+        'Batch Size': batch_size,
+        'accum_step': accum_step,
+        'Learning Rate': learning_rate,
+        'Train Count': train_count,
+        'Validation Count' : val_count,
+        'Loss Functions' : loss_functions,
+        'Loss Weights' : loss_weights,
+        'Perceptual Loss Layer' : perc_block
+    }
+    helper.json_write_wrapper(args = args,save_path = dir_name)
+    
 
 # MAIN FUNCTION
 if __name__ == '__main__':
@@ -204,15 +228,11 @@ if __name__ == '__main__':
                 batch_size = 5,
                 learning_rate = 4.5E-4,
                 r_train = 0.8,
-                Perceptual_loss=True,
-                pix_loss = True,
-                layer_loss=False,
-                loss_functions = ['mse','pearson','ssim','Perceptual_loss'],
-                weights = [1,2,1,1]
-                )
-
+                loss_functions = ['mse','pearson','ssim','Perceptual loss'],
+                loss_weights = [1,2,1,1],
+                perc_block = [0,0,1,0]
+                )    
     
-
 
 
 
