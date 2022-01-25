@@ -41,10 +41,6 @@ class unet_dataset(Dataset): # For the focus dataset
         out_name = join(self.dir,'In_Focus',self.dataset_list[idx][1])
         mask_name = join(self.dir,'In_Focus/Mask',self.dataset_list[idx][1])
 
-        # Separate idx and evaluate didx
-        z_in = self.dataset_list[idx][0].split("_z")[1].split("_m")[0]
-        z_out = self.dataset_list[idx][1].split("_z")[1].split("_m")[0]
-
         # Read images as torch tensor (Might need to fix)
         #rescaled_in = medfilt(((tifffile.imread(in_name)+np.pi)/(2*np.pi)),kernel_size = 3)
         #rescaled_out = medfilt(((tifffile.imread(out_name)+np.pi)/(2*np.pi)),kernel_size = 3)
@@ -70,33 +66,27 @@ class unet_dataset_collagen(Dataset): # For the focus dataset
         self.dir = dir
         self.xrange = [xmin,xmax]
         self.yrange = [ymin,ymax]
-        self.dataset_list = []
+        self.dataset_list = pd.read_csv(join(dir,'data_012122.csv'), header=None).values.tolist()
         self.transform = transform
         self.mask_min = mask_min
         self.mask_max = mask_max
 
     def __len__(self):
-        files =
-        return
+        return len(self.dataset_list)
     def __getitem__(self,idx):
         # This method returns dictionary of {in, out} pair given the idx AS TORCH TENSORS
         # The format is -> GT name = Input image just with z(idx) with idx(GT) =/= idx(input)
         # Find index in string to locate "z" and find string that matches substring right upto z
-        in_name = join(self.dir,'Out_Of_Focus/processed',self.dataset_list[idx][0])
-        out_name = join(self.dir,'In_Focus',self.dataset_list[idx][1])
-        mask_name = join(self.dir,'In_Focus/Mask',self.dataset_list[idx][1])
-
-        # Separate idx and evaluate didx
-        z_in = self.dataset_list[idx][0].split("_z")[1].split("_m")[0]
-        z_out = self.dataset_list[idx][1].split("_z")[1].split("_m")[0]
+        in_name = join(self.dir,self.dataset_list[idx][0])
+        out_name = join(self.dir,'subtracted',self.dataset_list[idx][1])
+        mask_name = join(self.dir,'subtracted','mask',self.dataset_list[idx][1])
 
         # Read images as torch tensor (Might need to fix)
         #rescaled_in = medfilt(((tifffile.imread(in_name)+np.pi)/(2*np.pi)),kernel_size = 3)
         #rescaled_out = medfilt(((tifffile.imread(out_name)+np.pi)/(2*np.pi)),kernel_size = 3)
         rescaled_in = (tifffile.imread(in_name) + np.pi) / (2 * np.pi)
-        rescaled_out = (tifffile.imread(out_name) + np.pi) / (2 * np.pi)
+        rescaled_out = (tifffile.imread(out_name) - self.yrange[0]) / (self.yrange[1] - self.yrange[0])
         mask_in = tifffile.imread(mask_name)*(self.mask_max-self.mask_min)+self.mask_min
-
 
         im_in = self.transform(rescaled_in.astype('float32'))
         im_out = self.transform(rescaled_out.astype('float32'))

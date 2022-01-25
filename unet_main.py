@@ -13,7 +13,8 @@ class UNet(nn.Module):
                  in_channels = 1, 
                  out_channels = 1, 
                  base_num_filter=32, 
-                 decoder_probe_points: List[int] = None 
+                 decoder_probe_points: List[int] = None,
+                 super_res: bool = False
                  ):
 
         super(UNet, self).__init__()
@@ -34,16 +35,24 @@ class UNet(nn.Module):
         self.bottle_neck = blk.DownEncoder(kernel_size = 3, in_channels = self.base_num_filter*8, out_channels = self.base_num_filter*16)
         
         #------ Decoder -----#
-        '''
-        self.decoder1 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*16, out_channels = self.base_num_filter*8)
-        self.decoder2 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*8, out_channels = self.base_num_filter*4)
-        self.decoder3 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*4, out_channels = self.base_num_filter*2)
-        self.decoder4 = blk.UpDecoder(kernel_size = 3, in_channels = self.base_num_filter*2, out_channels = self.base_num_filter)
-        '''
-        self.decoder1 = blk.UpDecoder_1(kernel_size = 3, in_channels = self.base_num_filter*16, out_channels = self.base_num_filter*8)
-        self.decoder2 = blk.UpDecoder_1(kernel_size = 3, in_channels = self.base_num_filter*8, out_channels = self.base_num_filter*4)
-        self.decoder3 = blk.UpDecoder_1(kernel_size = 3, in_channels = self.base_num_filter*4, out_channels = self.base_num_filter*2)
-        self.decoder4 = blk.UpDecoder_1(kernel_size = 3, in_channels = self.base_num_filter*2, out_channels = self.base_num_filter)
+        if super_res:
+            self.decoder1 = blk.UpDecoder_1(kernel_size=3, in_channels=self.base_num_filter * 16,
+                                            out_channels=self.base_num_filter * 8)
+            self.decoder2 = blk.UpDecoder_1(kernel_size=3, in_channels=self.base_num_filter * 8,
+                                            out_channels=self.base_num_filter * 4)
+            self.decoder3 = blk.UpDecoder_1(kernel_size=3, in_channels=self.base_num_filter * 4,
+                                            out_channels=self.base_num_filter * 2)
+            self.decoder4 = blk.UpDecoder_1(kernel_size=3, in_channels=self.base_num_filter * 2,
+                                            out_channels=self.base_num_filter)
+        else:
+            self.decoder1 = blk.UpDecoder(kernel_size=3, in_channels=self.base_num_filter * 16,
+                                          out_channels=self.base_num_filter * 8)
+            self.decoder2 = blk.UpDecoder(kernel_size=3, in_channels=self.base_num_filter * 8,
+                                          out_channels=self.base_num_filter * 4)
+            self.decoder3 = blk.UpDecoder(kernel_size=3, in_channels=self.base_num_filter * 4,
+                                          out_channels=self.base_num_filter * 2)
+            self.decoder4 = blk.UpDecoder(kernel_size=3, in_channels=self.base_num_filter * 2,
+                                          out_channels=self.base_num_filter)
 
         if decoder_probe_points is not None : 
             assert len(self.decoder_probe_points) <= 4, f'Size of decoder probe points must be at most the number of decoder blocks'

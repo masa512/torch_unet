@@ -18,6 +18,19 @@ from layer_loss import LayerLoss
 from tqdm import tqdm
 import time 
 import json
+def seed_everything(SEED=42):
+    """
+    A function to seed all random generators with SEED
+    :param SEED: the value to use to seed all random generators
+    :return: None
+    """
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
+    torch.backends.cudnn.benchmark = True
+
+seed_everything()
 
 def train_unet(network,
                 device, 
@@ -25,15 +38,16 @@ def train_unet(network,
                 batch_size: int = 2, 
                 accum_step: int = 50, 
                 learning_rate = 1E-4,
-                r_train = 0.6,
+                r_train = 0.8,
                 r_val = 0.2,
                 loss_functions: str = [],
                 loss_weights = [],
                 perc_block = [0,0,0,0],
-                masked: bool = False
+                masked: bool = False,
                 ):
 
     # Step 1 : Load dataset and load model to device
+
     network.to('cuda')
     # Save location 
     project_name = "Focus"
@@ -50,14 +64,15 @@ def train_unet(network,
     # Define transforms to apply in dataset
     trans = transforms.Compose([
                                 transforms.ToPILImage(),
-                                transforms.CenterCrop(600),
+                                transforms.CenterCrop(800),
                                 transforms.ToTensor(),
                                ])
 
     # Path to the dataset
+    #path_img = r"./../PLM_data"
     path_img = r"./../Hela_data"
-    #dataset = helper.unet_dataset(dir = path_img, xmin = -np.pi , xmax=np.pi, ymin = -np.pi , ymax=np.pi, transform=trans)
-    dataset =
+    dataset = helper.unet_dataset(dir = path_img, xmin = -np.pi , xmax=np.pi, ymin = -np.pi , ymax=np.pi, transform=trans)
+    #dataset = helper.unet_dataset_collagen(dir = path_img, xmin = -np.pi , xmax=np.pi, ymin = 0 , ymax= 20000, transform=trans)
     # Step 2 : Split training/val
     train_count = round(r_train*dataset.__len__())
     print(train_count)
@@ -67,7 +82,7 @@ def train_unet(network,
 
     # Step 3 : Dataloader in order to shuffle dateset in batches for training efficiency
     trainloader = DataLoader(train_set, shuffle=True, batch_size=batch_size)
-    valloader = DataLoader(val_set, shuffle=False, drop_last=True,batch_size=1) # This one set as 1
+    valloader = DataLoader(val_set, shuffle=False, drop_last=True, batch_size=1) # This one set as 1
 
     # Step 4 : Setup optimizer, lr scheduler, 
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
@@ -103,6 +118,7 @@ def train_unet(network,
     # Training Begins
     best_val_loss = 1000 # anything high to begin with 
     epoch_loss = []
+    val_loss = []
     for t in range(num_epochs):
         print(f"-------------------EPOCH {t+1}-----------------------")
 
@@ -110,6 +126,7 @@ def train_unet(network,
         batch_losses = []
         ti = time.time()
         for i, batch in enumerate(trainloader):# Extract one permutation of training data on the GPU
+            print(f"Batch {i}/{len(trainloader)}", end = "\r")
             input_batch = batch['Input'].to(device=device, dtype=torch.float32)
             gt_batch = batch['GT'].to(device=device, dtype=torch.float32)
             y, intermediate = network(input_batch)# Prediction output with layer
@@ -155,7 +172,6 @@ def train_unet(network,
             os.makedirs(pred_path)
     
         network.eval() # Change to evaluation mode when evaluating validation loss
-        val_loss = []
         with torch.no_grad():
             # Evaluate epoch loss every end of epoch
             batch_loss = []
@@ -182,7 +198,7 @@ def train_unet(network,
                             val_l += loss_weights[idx]*losses[loss_fnx](gt_batch,y,blocks=perc_block)
                         else:
                             val_l += loss_weights[idx]*losses[loss_fnx](gt_batch,y)
-                    batch_loss.append(val_l)
+                    batch_loss.append(val_l.item())
             val_loss.append(np.mean(batch_loss))
         deltat = time.time()-ti
         train_loss.append(np.mean(epoch_loss))
@@ -287,23 +303,49 @@ def train_unet(network,
 # MAIN FUNCTION
 if __name__ == '__main__':
 
-    network = UNet(decoder_probe_points = [1,3])
-
     if torch.cuda.is_available():
         print(f"The CUDA GPU IS USED with msg {torch.cuda.is_available()}")
     else:
         print("GPU not really working: Running with CPU")
+
+    '''
+    network = UNet(decoder_probe_points=[1, 3],super_res = True)
     train_unet(network=network, 
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
-                num_epochs = 40,
-                batch_size = 7,
+                num_epochs = 256,
+                batch_size = 4,
                 learning_rate = 4.5e-4,
-                loss_functions = ['mse','pearson','perceptual loss'],
-                loss_weights = [1,1,1],
-                perc_block = [0,0,1,0],
-                masked = True
-                )    
+                loss_functions = ['mse','pearson'],
+                loss_weights = [1,1],
+                #perc_block = [0,0,1,0],
+                masked = True,
+                )
+    '''
+    network = UNet(decoder_probe_points=[1, 3], super_res = False)
+    train_unet(network=network,
+               device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+               num_epochs=100,
+               batch_size=4,
+               learning_rate=4.5e-4,
+               loss_functions=['mse', 'pearson', 'perceptual loss'],
+               loss_weights=[1, 1, 1],
+               perc_block=[0, 0, 1, 0],
+               masked=True
+               )
+
+    network = UNet(decoder_probe_points=[1, 3], super_res = False)
+    train_unet(network=network,
+               device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+               num_epochs=100,
+               batch_size=4,
+               learning_rate=4.5e-4,
+               loss_functions=['mse', 'pearson'],
+               loss_weights=[1, 1],
+               #perc_block=[0, 0, 1, 0],
+               masked=True
+               )
     
+
 
 
 
