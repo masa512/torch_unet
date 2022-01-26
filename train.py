@@ -109,7 +109,7 @@ def train_unet(network,
     accum_step = min(accum_step,round(num_batches/10))
 
     # Make loss function as dictionary
-    #loss_functions = helper.loss_function_wrapper()
+    loss_functions = helper.loss_function_wrapper()
     # Define scores
     scores = helper.metric_wrapper()
 
@@ -137,6 +137,7 @@ def train_unet(network,
             loss = helper.evaluate_loss_wrapper(y,
                                                 gt_batch,
                                                 intermediate,
+                                                loss_functions,
                                                 loss_used,
                                                 loss_weights,
                                                 masked,
@@ -152,11 +153,6 @@ def train_unet(network,
             optimizer.zero_grad()
             if run_mode is 'test':
                 break
-            # REMOVE WHEN NECESSARY
-            if i == 196:
-                break
-            end_time = time.time()
-            print(f'{ti - end_time}')
         epoch_loss.append(np.mean(batch_losses))
 
         # Path to save images for PROGRESS
@@ -181,6 +177,7 @@ def train_unet(network,
                 val_l = helper.evaluate_loss_wrapper(pred_batch_val,
                                                      gt_batch_val,
                                                      intermediate,
+                                                     loss_functions,
                                                      loss_used,
                                                      loss_weights,
                                                      masked,
@@ -312,7 +309,7 @@ if __name__ == '__main__':
     network = UNet(decoder_probe_points=[1, 3], super_res=True)
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-               num_epochs=1,
+               num_epochs=70,
                batch_size=batch_size,
                learning_rate=4.5e-4,
                loss_used=['mse', 'pearson', 'perceptual loss'],
@@ -325,7 +322,7 @@ if __name__ == '__main__':
     network = UNet(decoder_probe_points=[1, 3],super_res = True)
     train_unet(network=network, 
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
-                num_epochs = 100,
+                num_epochs = 70,
                 batch_size = batch_size,
                 learning_rate = 4.5e-4,
                 loss_used = ['mse','pearson'],
@@ -338,7 +335,7 @@ if __name__ == '__main__':
     network = UNet(decoder_probe_points=[1, 3], super_res = False)
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-               num_epochs=100,
+               num_epochs=70,
                batch_size=batch_size,
                learning_rate=4.5e-4,
                loss_used=['mse', 'pearson', 'perceptual loss'],
@@ -352,7 +349,7 @@ if __name__ == '__main__':
     network = UNet(decoder_probe_points=[1, 3], super_res = False)
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-               num_epochs=100,
+               num_epochs=70,
                batch_size=batch_size,
                learning_rate=4.5e-4,
                loss_used=['mse', 'pearson'],

@@ -265,6 +265,7 @@ def mask_wrapper(y,gt,M):
 def evaluate_loss_wrapper(y,
                           gt_batch,
                           intermediate,
+                          loss_functions = [],
                           loss_used = [],
                           loss_weights = [],
                           masked=False,
@@ -272,7 +273,6 @@ def evaluate_loss_wrapper(y,
                           perc_block = [0,0,1,0]
                           ):
     loss = 0
-    loss_functions = loss_function_wrapper()
     if mode =='train': # TRAINING
         # When empty just do mse by default
         if not loss_used:
