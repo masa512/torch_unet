@@ -20,7 +20,10 @@ from scipy.signal import medfilt
 from torch.fft import fft
 import json
 import csv
-
+from torch_percloss import Perceptual_loss as percloss
+from layer_loss import LayerLoss
+import time
+'''
 class unet_dataset(Dataset): # For the focus dataset 
     def __init__(self, dir:str , xmin = 0, xmax = 1, ymin = 0, ymax = 1,transform = None, mask_min = 0.4, mask_max = 1):
         self.dir = dir
@@ -28,6 +31,47 @@ class unet_dataset(Dataset): # For the focus dataset
         self.yrange = [ymin,ymax]
         self.transform = transform
         self.dataset_list = pd.read_csv(join(dir,'train_12_19_2021.csv'), header=None).values.tolist()
+        self.mask_min = mask_min
+        self.mask_max = mask_max
+
+    def __len__(self):
+        return len(self.dataset_list)
+    def __getitem__(self,idx):
+        # This method returns dictionary of {in, out} pair given the idx AS TORCH TENSORS
+        # The format is -> GT name = Input image just with z(idx) with idx(GT) =/= idx(input)
+        # Find index in string to locate "z" and find string that matches substring right upto z
+        in_name = join(self.dir,'Out_Of_Focus/processed',self.dataset_list[idx][0])
+        out_name = join(self.dir,'In_Focus',self.dataset_list[idx][1])
+        mask_name = join(self.dir,'In_Focus/Mask',self.dataset_list[idx][1])
+
+        # Read images as torch tensor (Might need to fix)
+        #rescaled_in = medfilt(((tifffile.imread(in_name)+np.pi)/(2*np.pi)),kernel_size = 3)
+        #rescaled_out = medfilt(((tifffile.imread(out_name)+np.pi)/(2*np.pi)),kernel_size = 3)
+        rescaled_in = (tifffile.imread(in_name) + np.pi) / (2 * np.pi)
+        rescaled_out = (tifffile.imread(out_name) + np.pi) / (2 * np.pi)
+        mask_in = tifffile.imread(mask_name)*(self.mask_max-self.mask_min)+self.mask_min
+
+
+        im_in = self.transform(rescaled_in.astype('float32'))
+        im_out = self.transform(rescaled_out.astype('float32'))
+        mask_in = self.transform(mask_in.astype('float32'))
+
+        return {
+            'Input' : im_in,
+            'GT' : im_out,
+            'mask': mask_in,
+            'in_name' : self.dataset_list[idx][0],
+            'gt_name' : self.dataset_list[idx][1]
+        }
+'''
+
+class unet_dataset(Dataset): # For the focus dataset
+    def __init__(self, dir:str , xmin = 0, xmax = 1, ymin = 0, ymax = 1,transform = None, mask_min = 0.4, mask_max = 1, csv_name:str = None):
+        self.dir = dir
+        self.xrange = [xmin,xmax]
+        self.yrange = [ymin,ymax]
+        self.transform = transform
+        self.dataset_list = pd.read_csv(join(dir,csv_name), header=None).values.tolist()
         self.mask_min = mask_min
         self.mask_max = mask_max
 
@@ -197,4 +241,64 @@ def csv_write_wrapper(header:str, entries:str, path:str):
         csv_writer.writerow(header)
         for d in entries:
             csv_writer.writerow([e[1] for e in list(d.items())])
+def loss_function_wrapper():
+    losses = {
+        "perceptual loss": percloss().to(device=torch.device('cuda')),
+        "mse": torch.nn.MSELoss(),
+        "layer loss": LayerLoss(3, device='cuda'),
+        "ssim": SSIM_loss(),
+        "pearson": pearson_loss()
+    }
+    return losses
+
+def metric_wrapper():
+    scores = {
+        "psnr": PSNR_score(),
+        "ssim": SSIM_score(),
+        "pearson": pearson_score(),
+    }
+    return scores
+
+def mask_wrapper(y,gt,M):
+    return [y*M,gt*M]
+
+def evaluate_loss_wrapper(y,
+                          gt_batch,
+                          intermediate,
+                          loss_used = [],
+                          loss_weights = [],
+                          masked=False,
+                          mode = 'train',
+                          perc_block = [0,0,1,0]
+                          ):
+    loss = 0
+    loss_functions = loss_function_wrapper()
+    if mode =='train': # TRAINING
+        # When empty just do mse by default
+        if not loss_used:
+            raise Exception("You can't optimize without loss function rite? ;-)")
+        elif 'layer_loss' in loss_used and masked:
+            raise Exception("Layer loss can't be done with mask .... :( Use Perceptual")
+        elif len(loss_used) != len(loss_weights):
+            raise Exception("Length of the loss fnc and weight used are DIFF")
+        else:
+            for idx, loss_fnx in enumerate(loss_used):
+                if loss_fnx == 'layer loss':
+                    loss += loss_weights[idx] * loss_functions[loss_fnx](gt_batch, y, *intermediate)
+                elif loss == 'perceptual loss':
+                    loss += loss_weights[idx] * loss_functions[loss_fnx](gt_batch, y, blocks=perc_block)
+                else:
+                    loss += loss_weights[idx] * loss_functions[loss_fnx](gt_batch, y)
+
+    else: # FOR VALIDATION AND TEST?
+        for idx, loss_fnx in enumerate(loss_used):
+            if loss_fnx == 'layer loss':
+                loss += loss_weights[idx] * loss_functions[loss_fnx](gt_batch, y, *intermediate)
+            elif loss == 'perceptual loss':
+                loss += loss_weights[idx] * loss_functions[loss_fnx](gt_batch, y, blocks=perc_block)
+            else:
+                loss += loss_weights[idx] * loss_functions[loss_fnx](gt_batch, y)
+    return loss
+
+
 

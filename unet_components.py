@@ -88,7 +88,7 @@ class UpDecoder_1(nn.Module):
             for i in range(round(np.log2(upfactor))):
                 up_modules.append(nn.Upsample(scale_factor = 2, mode = mode))
             '''
-            up_modules.append(nn.Upsample(scale_factor = upfactor, mode = mode))
+            up_modules.append(nn.Upsample(scale_factor = upfactor, mode = mode, align_corners = True))
             up_modules.append(nn.Conv2d(in_channels = in_channels, out_channels = out_channels, kernel_size = 1)) 
 
         # THE DOWNSCALING PART

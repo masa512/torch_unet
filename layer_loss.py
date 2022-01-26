@@ -1,7 +1,7 @@
 import torch
 import torchvision
 import torch.nn as nn
-from helper import *
+import helper
 
 # what is another name for someone who identifies themnselves as interdisciplinary
 # - jack of all trades, masters of none, aka michael.
@@ -16,9 +16,8 @@ class LayerLoss(nn.Module):
       self.add_module(f'layerLossConv_{i}', self.convs[-1])
      
     self.mse_loss = nn.MSELoss()
-    self.ssim_loss = SSIM_loss()
-    self.pcc_loss = pearson_loss()
-    
+    self.ssim_loss = helper.SSIM_loss()
+    self.pcc_loss = helper.pearson_loss()
   
   def forward(self, target, y, *_input):
     l = 0

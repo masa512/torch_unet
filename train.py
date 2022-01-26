@@ -32,24 +32,52 @@ def seed_everything(SEED=42):
 
 seed_everything()
 
+def data_loader_wrapper(batch_size:int = 1):
+    path_img = r"./../Hela_data"
+
+    trans = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.CenterCrop(800),
+        transforms.ToTensor(),
+    ])
+    csv_names = ['train_012522.csv']
+    csv_names.append(csv_names[0].replace('train', 'val'))
+    csv_names.append(csv_names[0].replace('train', 'test'))
+
+    data_loaders = []
+    for csv_name in csv_names:
+        data_set = helper.unet_dataset(dir=path_img,
+                                        xmin=-np.pi,
+                                        xmax=np.pi,
+                                        ymin=-np.pi,
+                                        ymax=np.pi,
+                                        transform=trans,
+                                        csv_name = csv_name)
+        if 'test' in csv_name or 'val' in csv_name:
+            data_loaders.append(DataLoader(data_set, shuffle=False, drop_last=False, batch_size=1))
+        else:
+            data_loaders.append(DataLoader(data_set, shuffle=True, drop_last = False, batch_size = batch_size))
+    return data_loaders
+
 def train_unet(network,
                 device, 
                 num_epochs: int = 1,
                 batch_size: int = 2, 
                 accum_step: int = 50, 
                 learning_rate = 1E-4,
-                r_train = 0.8,
-                r_val = 0.2,
-                loss_functions: str = [],
+                data_loaders = None,
+                loss_used: str = [],
                 loss_weights = [],
                 perc_block = [0,0,0,0],
                 masked: bool = False,
+                run_mode: str = 'train'
                 ):
 
     # Step 1 : Load dataset and load model to device
 
+    global gt_batch
     network.to('cuda')
-    # Save location 
+    # Save location
     project_name = "Focus"
     dir_name = project_name + time.strftime("%Y%m%d-%H%M%S")
 
@@ -62,27 +90,9 @@ def train_unet(network,
 
 
     # Define transforms to apply in dataset
-    trans = transforms.Compose([
-                                transforms.ToPILImage(),
-                                transforms.CenterCrop(800),
-                                transforms.ToTensor(),
-                               ])
-
-    # Path to the dataset
-    #path_img = r"./../PLM_data"
-    path_img = r"./../Hela_data"
-    dataset = helper.unet_dataset(dir = path_img, xmin = -np.pi , xmax=np.pi, ymin = -np.pi , ymax=np.pi, transform=trans)
-    #dataset = helper.unet_dataset_collagen(dir = path_img, xmin = -np.pi , xmax=np.pi, ymin = 0 , ymax= 20000, transform=trans)
-    # Step 2 : Split training/val
-    train_count = round(r_train*dataset.__len__())
-    print(train_count)
-    val_count = round(r_val*dataset.__len__())
-    test_count = dataset.__len__()- train_count - val_count
-    train_set, val_set, test_set = random_split(dataset, [train_count,val_count,test_count])
 
     # Step 3 : Dataloader in order to shuffle dateset in batches for training efficiency
-    trainloader = DataLoader(train_set, shuffle=True, batch_size=batch_size)
-    valloader = DataLoader(val_set, shuffle=False, drop_last=True, batch_size=1) # This one set as 1
+    trainloader,valloader = data_loaders[0],data_loaders[1]
 
     # Step 4 : Setup optimizer, lr scheduler, 
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
@@ -93,32 +103,20 @@ def train_unet(network,
     #  Define a vector for validation loss
     train_loss = []
     val_loss = []
-    num_batches = train_set.__len__()//batch_size
+    num_batches = len(trainloader)//batch_size
 
     # Redefine the accumulation step
     accum_step = min(accum_step,round(num_batches/10))
-    print(accum_step)
 
     # Make loss function as dictionary
-    losses = {
-        "perceptual loss" : percloss().to(device=device),
-        "mse" : torch.nn.MSELoss(),
-        "layer loss" : LayerLoss(3, device='cuda'),
-        "ssim" : helper.SSIM_loss(),
-        "pearson" : helper.pearson_loss()
-    }
+    #loss_functions = helper.loss_function_wrapper()
     # Define scores
-    scores = {
-        "psnr" : helper.PSNR_score(),
-        "ssim" : helper.SSIM_score(),
-        "pearson" : helper.pearson_score(),
-    }
+    scores = helper.metric_wrapper()
 
 
     # Training Begins
     best_val_loss = 1000 # anything high to begin with 
     epoch_loss = []
-    val_loss = []
     for t in range(num_epochs):
         print(f"-------------------EPOCH {t+1}-----------------------")
 
@@ -133,30 +131,18 @@ def train_unet(network,
 
             # MASK
             if masked:
-                _m = batch['mask'].to(device=device, dtype=torch.float32)
-                y = y*_m
-                gt_batch = gt_batch*_m
+                y, gt_batch = helper.mask_wrapper(y,gt_batch,batch['mask'].to(device=device, dtype=torch.float32))
 
             end_time = time.time()
-            
-            loss = 0
-            # When empty just do mse by default
-            if not loss_functions:
-                raise Exception("You can't optimize without loss function rite? ;-)")
-            elif 'layer_loss' in loss_functions and masked:
-                raise Exception("Layer loss can't be done with mask .... :( Use Perceptual")
-            elif len(loss_functions) != len(loss_weights):
-                raise Exception("Length of the loss fnc and weight used are DIFF")
-            else:
-                for idx, loss_fnx in enumerate(loss_functions):
-                    if loss_fnx == 'layer loss':
-                        loss += loss_weights[idx]*losses[loss_fnx](gt_batch,y,*intermediate)
-                    elif loss == 'perceptual loss':
-                        loss += loss_weights[idx]*losses[loss_fnx](gt_batch,y,blocks=perc_block)                   
-                    else:
-                        loss += loss_weights[idx]*losses[loss_fnx](gt_batch,y)
-        
-            
+            loss = helper.evaluate_loss_wrapper(y,
+                                                gt_batch,
+                                                intermediate,
+                                                loss_used,
+                                                loss_weights,
+                                                masked,
+                                                mode = 'train',
+                                                perc_block = [0,0,1,0])
+
             loss.backward() # Accumulate gradient
             batch_losses.append(loss.item()) # Add current batch loss
             #print(f'\r loss: {epoch_loss[-1]}', end='   ')
@@ -164,6 +150,13 @@ def train_unet(network,
             # if (i+1) % accum_step == 0 or i+1 == len(trainloader):
             optimizer.step()
             optimizer.zero_grad()
+            if run_mode is 'test':
+                break
+            # REMOVE WHEN NECESSARY
+            if i == 196:
+                break
+            end_time = time.time()
+            print(f'{ti - end_time}')
         epoch_loss.append(np.mean(batch_losses))
 
         # Path to save images for PROGRESS
@@ -179,26 +172,22 @@ def train_unet(network,
             #input_batch = helper.AddGaussNoise(0,0.1)(batch[0].to(device=device, dtype=torch.float32))
                 input_batch_val = batch_val['Input'].to(device=device, dtype=torch.float32)
                 gt_batch_val = batch_val['GT'].to(device=device, dtype=torch.float32)
-                pred_batch_val = network(input_batch_val)# Prediction output
+                pred_batch_val, intermediate = network(input_batch_val)# Prediction output
 
                 # Write the validation states
-                imsave(os.path.join(pred_path,batch_val['in_name'][0]),pred_batch_val[0].cpu().detach().numpy()[0,:,:,:])
+                #imsave(os.path.join(pred_path,batch_val['in_name'][0]),torch.squeeze(pred_batch_val).cpu().detach().numpy())
 
                 # Define three loss functions : Perceptual, pixel-wise loss, layer-wise loss
-                if not loss_functions:
-                    raise Exception("You can't optimize without loss function rite? ;-)")
-                elif len(loss_functions) != len(loss_weights):
-                    raise Exception("Length of the loss fnc and weight used are DIFF")
-                else:
-                    val_l = 0
-                    for idx, loss_fnx in enumerate(loss_functions):
-                        if loss_fnx == 'layer loss':
-                            val_l += loss_weights[idx]*losses[loss_fnx](gt_batch,y,*intermediate)
-                        elif loss == 'perceptual loss':
-                            val_l += loss_weights[idx]*losses[loss_fnx](gt_batch,y,blocks=perc_block)
-                        else:
-                            val_l += loss_weights[idx]*losses[loss_fnx](gt_batch,y)
-                    batch_loss.append(val_l.item())
+                val_l = helper.evaluate_loss_wrapper(pred_batch_val,
+                                                     gt_batch_val,
+                                                     intermediate,
+                                                     loss_used,
+                                                     loss_weights,
+                                                     masked,
+                                                     mode = 'val')
+                batch_loss.append(val_l.item())
+                if run_mode is 'test':
+                    break
             val_loss.append(np.mean(batch_loss))
         deltat = time.time()-ti
         train_loss.append(np.mean(epoch_loss))
@@ -221,7 +210,11 @@ def train_unet(network,
     #================================== Step 8 : Save validation outputs accordingly ==================================#
     network.eval()
 
-    # Path to save images 
+    # Path to save images
+
+    # VALIDATION SAVE WRAPPER?
+
+
     out_path = os.path.join(dir_name,'val_outputs')
     if not os.path.exists(out_path):
         os.makedirs(out_path)
@@ -244,14 +237,14 @@ def train_unet(network,
         for i, batch in enumerate(valloader):
             input_img = batch['Input'].to(device=device, dtype=torch.float32)
             gt_img = batch['GT'].to(device=device, dtype=torch.float32)
-            pred_img = network(input_img)# Prediction output
+            pred_img, _ = network(input_img)# Prediction output
             in_name = batch['in_name'][0]
             gt_name = batch['gt_name'][0]
 
             # Evaluate Scores
-            pearson_score = scores["pearson"](input_img,gt_img).item()
-            psnr_score = scores["psnr"](input_img,gt_img).item()
-            ssim_score = scores["ssim"](input_img,gt_img).item()
+            pearson_score = scores["pearson"](pred_img,gt_img).item()
+            psnr_score = scores["psnr"](pred_img,gt_img).item()
+            ssim_score = scores["ssim"](pred_img,gt_img).item()
 
             # Evaluate DeltaZ
             delZ = helper.evaluate_delZ_wrapper(in_name,gt_name)
@@ -267,9 +260,11 @@ def train_unet(network,
             })
 
             # Save image
-            imsave(os.path.join(in_path,f'image{i}.tif'),input_img.cpu().detach().numpy()[0,:,:,:])
-            imsave(os.path.join(gt_path,f'image{i}.tif'),gt_img.cpu().detach().numpy()[0,:,:,:])
-            imsave(os.path.join(pred_path,f'image{i}.tif'),pred_img[0].cpu().detach().numpy()[0,:,:,:])
+            imsave(os.path.join(in_path,'x_'+in_name),torch.squeeze(input_img).cpu().detach().numpy())
+            imsave(os.path.join(gt_path,'y_'+in_name),torch.squeeze(gt_img).cpu().detach().numpy())
+            imsave(os.path.join(pred_path,'p_'+in_name),torch.squeeze(pred_img).cpu().detach().numpy())
+            if run_mode is 'test':
+                break
 
 
     # Save statistics in CSV:
@@ -291,9 +286,9 @@ def train_unet(network,
         'Batch Size': batch_size,
         'accum_step': accum_step,
         'Learning Rate': learning_rate,
-        'Train Count': train_count,
-        'Validation Count' : val_count,
-        'Loss Functions' : loss_functions,
+        'Train Count': len(trainloader.dataset),
+        'Validation Count' : len(valloader.dataset),
+        'Loss Functions' : loss_used,
         'Loss Weights' : loss_weights,
         'Perceptual Loss Layer' : perc_block
     }
@@ -308,43 +303,64 @@ if __name__ == '__main__':
     else:
         print("GPU not really working: Running with CPU")
 
-    '''
+    # Initialize dataloaders
+    batch_size = 4
+    data_loaders = data_loader_wrapper(batch_size= batch_size)
+
+
+    # YES SUPER RES, YES PERCEPTUAL
+    network = UNet(decoder_probe_points=[1, 3], super_res=True)
+    train_unet(network=network,
+               device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+               num_epochs=1,
+               batch_size=batch_size,
+               learning_rate=4.5e-4,
+               loss_used=['mse', 'pearson', 'perceptual loss'],
+               loss_weights=[1, 1, 1],
+               data_loaders=data_loaders,
+               # perc_block = [0,0,1,0],
+               masked=True,
+               )
+    # YES SUPER RES, NO PERCEPTUAL
     network = UNet(decoder_probe_points=[1, 3],super_res = True)
     train_unet(network=network, 
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
-                num_epochs = 256,
-                batch_size = 4,
+                num_epochs = 100,
+                batch_size = batch_size,
                 learning_rate = 4.5e-4,
-                loss_functions = ['mse','pearson'],
+                loss_used = ['mse','pearson'],
                 loss_weights = [1,1],
+                data_loaders = data_loaders,
                 #perc_block = [0,0,1,0],
                 masked = True,
                 )
-    '''
+    # NO SUPER RES, YES PERCEPTUAL
     network = UNet(decoder_probe_points=[1, 3], super_res = False)
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                num_epochs=100,
-               batch_size=4,
+               batch_size=batch_size,
                learning_rate=4.5e-4,
-               loss_functions=['mse', 'pearson', 'perceptual loss'],
+               loss_used=['mse', 'pearson', 'perceptual loss'],
                loss_weights=[1, 1, 1],
+               data_loaders = data_loaders,
                perc_block=[0, 0, 1, 0],
                masked=True
                )
 
+    # NO SUPER RES, NO PERCEPTUAL
     network = UNet(decoder_probe_points=[1, 3], super_res = False)
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                num_epochs=100,
-               batch_size=4,
+               batch_size=batch_size,
                learning_rate=4.5e-4,
-               loss_functions=['mse', 'pearson'],
+               loss_used=['mse', 'pearson'],
                loss_weights=[1, 1],
+               data_loaders = data_loaders,
                #perc_block=[0, 0, 1, 0],
                masked=True
                )
-    
 
 
 

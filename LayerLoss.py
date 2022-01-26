@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import torch.nn as nn
+from helper import *
 
 # what is another name for someone who identifies themnselves as interdisciplinary
 # - jack of all trades, masters of none, aka michael.

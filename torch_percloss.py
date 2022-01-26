@@ -20,7 +20,7 @@ class Perceptual_loss(torch.nn.Module):
 		for p in self.parameters():
 			p.requires_grad = False
 
-	def forward(self,yhat,y,blocks=[0,0,0,0]):
+	def forward(self,yhat,y,blocks=[0,0,1,0]):
 		
 		# If number of channels is not 3 -> Force them to have size of 3:
 		if yhat.size(dim=1) != 3:
