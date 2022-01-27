@@ -18,6 +18,10 @@ from layer_loss import LayerLoss
 from tqdm import tqdm
 import time 
 import json
+import unet_components as blk
+
+
+
 def seed_everything(SEED=42):
     """
     A function to seed all random generators with SEED
@@ -307,6 +311,7 @@ if __name__ == '__main__':
 
     # YES SUPER RES, YES PERCEPTUAL
     network = UNet(decoder_probe_points=[1, 3], super_res=True)
+    network_cpy = copy.deepcopy(network).cpu()
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                num_epochs=70,
@@ -319,8 +324,9 @@ if __name__ == '__main__':
                masked=True,
                )
     # YES SUPER RES, NO PERCEPTUAL
-    network = UNet(decoder_probe_points=[1, 3],super_res = True)
-    train_unet(network=network, 
+    network = network_cpy
+    network_cpy = copy.deepcopy(network)
+    train_unet(network=network,
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
                 num_epochs = 70,
                 batch_size = batch_size,
@@ -332,7 +338,20 @@ if __name__ == '__main__':
                 masked = True,
                 )
     # NO SUPER RES, YES PERCEPTUAL
-    network = UNet(decoder_probe_points=[1, 3], super_res = False)
+    network = network_cpy
+    ## few lines of code to replace
+    network.decoder1 = blk.UpDecoder_1(kernel_size=3, in_channels=network.base_num_filter * 16,
+                                            out_channels=network.base_num_filter * 8)
+    network.decoder2 = blk.UpDecoder_1(kernel_size=3, in_channels=network.base_num_filter * 8,
+                                            out_channels=network.base_num_filter * 4)
+    network.decoder3 = blk.UpDecoder_1(kernel_size=3, in_channels=network.base_num_filter * 4,
+                                            out_channels=network.base_num_filter * 2)
+    network.decoder4 = blk.UpDecoder_1(kernel_size=3, in_channels=network.base_num_filter * 2,
+                                            out_channels=network.base_num_filter * 1)
+
+
+    network_cpy = copy.deepcopy(network)
+
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                num_epochs=70,
@@ -345,8 +364,8 @@ if __name__ == '__main__':
                masked=True
                )
 
+    network = network_cpy
     # NO SUPER RES, NO PERCEPTUAL
-    network = UNet(decoder_probe_points=[1, 3], super_res = False)
     train_unet(network=network,
                device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                num_epochs=70,
